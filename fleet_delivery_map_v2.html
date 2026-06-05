@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Delivery Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf6;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+#hdr{padding:8px 14px;background:#1a1d27;border-bottom:1px solid #2e3354;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap}
+#hdr h1{font-size:14px;font-weight:600;white-space:nowrap}
+.stat{display:flex;flex-direction:column;align-items:flex-end}
+.sv{font-size:15px;font-weight:700;color:#4f8ef7}
+.sl{font-size:9px;color:#8b92c4;text-transform:uppercase;letter-spacing:.5px}
+#stats{display:flex;gap:14px;margin-left:auto}
+#main{display:flex;flex:1;overflow:hidden}
+#sb{width:260px;background:#1a1d27;border-right:1px solid #2e3354;overflow-y:auto;flex-shrink:0}
+#map{flex:1}
+.sec{border-bottom:1px solid #2e3354;padding:10px 12px}
+.sec-t{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#8b92c4;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.fg{margin-bottom:8px}
+.fg label{font-size:11px;color:#8b92c4;display:block;margin-bottom:3px}
+select{width:100%;background:#22263a;border:1px solid #2e3354;border-radius:5px;color:#e8eaf6;font-size:11px;padding:4px 7px;cursor:pointer}
+input[type=range]{width:100%;accent-color:#4f8ef7}
+.rr{display:flex;align-items:center;gap:6px}
+.rv{font-size:12px;font-weight:600;color:#4f8ef7;min-width:44px;text-align:right}
+.di{display:flex;align-items:center;gap:7px;padding:6px 8px;background:#22263a;border:1px solid #2e3354;border-radius:5px;margin-bottom:5px;cursor:pointer}
+.di.inactive{opacity:.4}
+.dd{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dn{font-size:11px;font-weight:500;flex:1}
+.dc{font-size:10px;color:#8b92c4}
+.tb{width:18px;height:18px;border-radius:3px;border:1px solid #2e3354;background:transparent;cursor:pointer;color:#8b92c4;font-size:12px;display:flex;align-items:center;justify-content:center}
+.di.active .tb{background:#4f8ef7;border-color:#4f8ef7;color:#fff}
+.btn{border:1px solid #2e3354;background:transparent;color:#e8eaf6;border-radius:4px;font-size:11px;padding:4px 8px;cursor:pointer}
+.btn:hover{border-color:#4f8ef7;color:#4f8ef7}
+.bp{background:#4f8ef7;border-color:#4f8ef7;color:#fff}
+.bp:hover{background:#3a7de8;color:#fff}
+.bs{padding:2px 7px;font-size:10px}
+.bd{border-color:#e74c3c;color:#e74c3c}
+.bd:hover{background:#e74c3c;color:#fff}
+.adf{display:none;background:#22263a;border:1px solid #2e3354;border-radius:5px;padding:8px;margin-top:6px}
+.adf.open{display:block}
+.fr{display:flex;gap:5px;margin-bottom:5px}
+input[type=text],input[type=number]{background:#0f1117;border:1px solid #2e3354;border-radius:4px;color:#e8eaf6;font-size:11px;padding:4px 7px;width:100%}
+.zi{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer}
+.zs{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.zl{font-size:11px;flex:1}
+.zc{font-size:10px;color:#8b92c4}
+.leaflet-tooltip{background:#22263a!important;border:1px solid #2e3354!important;border-radius:5px!important;color:#e8eaf6!important;font-size:11px!important;padding:7px 9px!important;box-shadow:0 3px 12px rgba(0,0,0,.4)!important}
+.leaflet-tooltip::before{display:none!important}
+#notif{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9999;background:#1e4f2e;border:1px solid #2d7a44;border-radius:5px;color:#7fda9c;padding:6px 14px;font-size:11px;display:none;white-space:nowrap}
+#ip{position:absolute;bottom:14px;right:10px;z-index:1000;background:#1a1d27;border:1px solid #2e3354;border-radius:7px;padding:10px 12px;min-width:180px;display:none;max-width:220px}
+#ip.show{display:block}
+#ip-t{font-size:12px;font-weight:600;margin-bottom:6px}
+#ip-c{font-size:11px;color:#8b92c4;line-height:1.7}
+#mc{position:absolute;top:10px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:5px}
+.mb{background:#1a1d27;border:1px solid #2e3354;border-radius:5px;color:#e8eaf6;font-size:10px;padding:5px 9px;cursor:pointer;white-space:nowrap}
+.mb:hover{border-color:#4f8ef7;color:#4f8ef7}
+.mb.on{background:#4f8ef7;border-color:#4f8ef7;color:#fff}
+</style>
+</head>
+<body>
+<div id="hdr">
+  <h1>⬡ Fleet Delivery Map</h1>
+  <span id="dbadge" style="font-size:10px;background:#22263a;border:1px solid #2e3354;border-radius:3px;padding:2px 7px;color:#8b92c4"></span>
+  <div id="stats">
+    <div class="stat"><span class="sv" id="s-del">0</span><span class="sl">Deliveries</span></div>
+    <div class="stat"><span class="sv" id="s-dep">0</span><span class="sl">Depots</span></div>
+    <div class="stat"><span class="sv" id="s-zon">0</span><span class="sl">Zones</span></div>
+    <div class="stat"><span class="sv" id="s-una">0</span><span class="sl">Unassigned</span></div>
+  </div>
+</div>
+<div id="main">
+  <div id="sb">
+    <div class="sec">
+      <div class="sec-t">Filters</div>
+      <div class="fg"><label>Depot</label><select id="f-dep"><option value="">All depots</option></select></div>
+      <div class="fg"><label>Zone</label><select id="f-zon"><option value="">All zones</option></select></div>
+      <div class="fg"><label>View</label>
+        <select id="f-view">
+          <option value="dots">Coloured dots</option>
+          <option value="heat">Heatmap</option>
+          <option value="cluster">Clustered</option>
+        </select>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="sec-t">Depots <button class="btn bs bp" id="add-btn">+ Add</button></div>
+      <div class="adf" id="adf">
+        <div class="fr"><input type="text" id="nd-name" placeholder="Depot name" style="flex:2"/></div>
+        <div class="fr">
+          <input type="number" id="nd-lat" placeholder="Lat" step="0.0001"/>
+          <input type="number" id="nd-lng" placeholder="Long" step="0.0001"/>
+        </div>
+        <div class="fr">
+          <button class="btn bs bp" id="nd-ok">Add</button>
+          <button class="btn bs" id="nd-cancel">Cancel</button>
+          <button class="btn bs" id="nd-pick" title="Click map to set coords">📍</button>
+        </div>
+      </div>
+      <div id="depot-list"></div>
+    </div>
+    <div class="sec">
+      <div class="sec-t">Allocation Radius</div>
+      <div class="rr">
+        <input type="range" id="radius" min="5" max="100" value="30" step="5"/>
+        <span class="rv" id="rv">30 mi</span>
+      </div>
+      <p style="font-size:10px;color:#8b92c4;margin-top:5px;line-height:1.5">Nearest active depot within this radius is auto-assigned.</p>
+      <button class="btn bp" style="width:100%;margin-top:7px" id="realloc">↺ Reallocate All</button>
+    </div>
+    <div class="sec">
+      <div class="sec-t">Zone Legend</div>
+      <div id="zone-leg"></div>
+    </div>
+  </div>
+  <div style="position:relative;flex:1">
+    <div id="map"></div>
+    <div id="mc">
+      <button class="mb on" onclick="tog('zones',this)">Zone Colours</button>
+      <button class="mb on" onclick="tog('depots',this)">Depot Markers</button>
+      <button class="mb on" onclick="tog('radii',this)">Depot Radii</button>
+      <button class="mb" onclick="tog('unassigned',this)">Unassigned Only</button>
+    </div>
+    <div id="ip"><div id="ip-t"></div><div id="ip-c"></div></div>
+    <div id="notif"></div>
+  </div>
+</div>
+
+<script>
+// ── Zone colour palette ──────────────────────────────────────────────
+const ZC = {'1':'#4CAF50','2':'#2196F3','3':'#FF9800','4':'#E91E63','5':'#9C27B0',
+            '6':'#00BCD4','7':'#FF5722','8':'#607D8B','9':'#8BC34A','10':'#FFC107',
+            '0':'#aaa','':'#aaa'};
+const DC = ['#4f8ef7','#4CAF50','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#FFC107','#8BC34A','#607D8B'];
+
+// ── Parse URL hash ───────────────────────────────────────────────────
+// Format: lat~lng~zone~depot|lat~lng~zone~depot|...
+// Depots block appended after a ^ separator: ^name~lat~lng^name~lat~lng
+function parseHash() {
+  const raw = decodeURIComponent(location.hash.slice(1));
+  if (!raw) return { rows: [], depotOverride: null };
+
+  const parts = raw.split('^');
+  const rowsRaw = parts[0];
+  const depotBlocks = parts.slice(1);
+
+  const rows = rowsRaw.split('|').filter(Boolean).map(r => {
+    const f = r.split('~');
+    return { Lat: parseFloat(f[0]), Long: parseFloat(f[1]), DeliveryZone: f[2]||'', DeliveryDepot: f[3]||'', SectorCode: f[4]||'' };
+  }).filter(r => !isNaN(r.Lat) && !isNaN(r.Long));
+
+  const depotOverride = depotBlocks.length ? depotBlocks.map(b => {
+    const f = b.split('~');
+    return { name: f[0], lat: parseFloat(f[1]), lng: parseFloat(f[2]) };
+  }).filter(d => !isNaN(d.lat)) : null;
+
+  return { rows, depotOverride };
+}
+
+// ── State ────────────────────────────────────────────────────────────
+let allData = [], allocData = [], filtData = [];
+let picking = false;
+let heatLayer = null;
+let layers = { zones: true, depots: true, radii: true, unassigned: false };
+
+let DEPOTS = [
+  {id:'d1',name:'Manchester',lat:53.4808,lng:-2.2426,color:DC[0],active:true},
+  {id:'d2',name:'Birmingham',lat:52.4862,lng:-1.8904,color:DC[1],active:true},
+  {id:'d3',name:'Leeds',     lat:53.7997,lng:-1.5492,color:DC[2],active:true},
+  {id:'d4',name:'Sheffield', lat:53.3811,lng:-1.4701,color:DC[3],active:true},
+  {id:'d5',name:'Liverpool', lat:53.4084,lng:-2.9916,color:DC[4],active:true}
+];
+let dcIdx = 5;
+
+// ── Map ──────────────────────────────────────────────────────────────
+const map = L.map('map',{zoomControl:true,attributionControl:false}).setView([52.8,-1.8],7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+const dlyLG = L.layerGroup().addTo(map);
+const depLG = L.layerGroup().addTo(map);
+const radLG = L.layerGroup().addTo(map);
+
+// ── Haversine ────────────────────────────────────────────────────────
+function hav(la1,lo1,la2,lo2){
+  const R=3958.8,dL=(la2-la1)*Math.PI/180,dO=(lo2-lo1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dO/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ── Allocation ───────────────────────────────────────────────────────
+function allocate(data) {
+  const active = DEPOTS.filter(d=>d.active);
+  const r = parseInt(document.getElementById('radius').value);
+  return data.map(row => {
+    let best=null, bestD=Infinity;
+    for(const d of active){ const dist=hav(row.Lat,row.Long,d.lat,d.lng); if(dist<bestD){bestD=dist;best=d;} }
+    return best && bestD<=r
+      ? {...row, AssignedDepot:best.name, AssignedColor:best.color, distMi:bestD.toFixed(1)}
+      : {...row, AssignedDepot:'Unassigned', AssignedColor:'#555', distMi:bestD?bestD.toFixed(1):null};
+  });
+}
+
+// ── Render ───────────────────────────────────────────────────────────
+function render() {
+  dlyLG.clearLayers(); depLG.clearLayers(); radLG.clearLayers();
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+  const view = document.getElementById('f-view').value;
+  const r = parseInt(document.getElementById('radius').value);
+  const showAll = !layers.unassigned;
+  const enriched = filtData.map(row => allocData.find(a=>a.Lat===row.Lat&&a.Long===row.Long&&a.DeliveryDepot===row.DeliveryDepot)||row);
+  const toShow = showAll ? enriched : enriched.filter(r=>r.AssignedDepot==='Unassigned');
+
+  if(view==='heat'){
+    const pts = toShow.filter(r=>r.Lat&&r.Long).map(r=>[r.Lat,r.Long,0.6]);
+    if(pts.length) heatLayer=L.heatLayer(pts,{radius:25,blur:20,gradient:{0.2:'#2196F3',0.5:'#FF9800',1:'#E91E63'}}).addTo(map);
+  } else if(view==='cluster'){
+    const cells={};
+    toShow.forEach(row=>{
+      if(!row.Lat||!row.Long)return;
+      const k=`${row.Lat.toFixed(2)},${row.Long.toFixed(2)}`;
+      if(!cells[k])cells[k]={lat:+row.Lat.toFixed(2),lng:+row.Long.toFixed(2),count:0,color:rowColor(row),rows:[]};
+      cells[k].count++;cells[k].rows.push(row);
+    });
+    Object.values(cells).forEach(c=>{
+      const m=L.circleMarker([c.lat,c.lng],{radius:Math.min(4+c.count*.5,18),fillColor:c.color,color:'rgba(0,0,0,.3)',weight:1,fillOpacity:.75});
+      m.bindTooltip(c.count>1?`<b>${c.count} deliveries</b>`:tip(c.rows[0]),{sticky:true,offset:[8,0]});
+      dlyLG.addLayer(m);
+    });
+  } else {
+    toShow.forEach(row=>{
+      if(!row.Lat||!row.Long)return;
+      const m=L.circleMarker([row.Lat,row.Long],{radius:5,fillColor:rowColor(row),color:'rgba(0,0,0,.25)',weight:1,fillOpacity:.85});
+      m.bindTooltip(tip(row),{sticky:true,offset:[8,0]});
+      m.on('click',()=>showInfo(row));
+      if(layers.zones)dlyLG.addLayer(m);
+    });
+  }
+
+  if(layers.depots){
+    DEPOTS.forEach(d=>{
+      const ico=L.divIcon({html:`<div style="background:${d.color};width:13px;height:13px;border-radius:50%;border:2px solid #fff;opacity:${d.active?1:.3}"></div>`,className:'',iconAnchor:[6,6]});
+      const m=L.marker([d.lat,d.lng],{icon:ico,zIndexOffset:1000});
+      m.bindTooltip(`<b>${d.name}</b><br>${d.active?'Active':'Inactive'}`);
+      m.on('click',()=>showDepotInfo(d));
+      depLG.addLayer(m);
+      const lbl=L.divIcon({html:`<div style="color:${d.color};font-size:10px;font-weight:700;white-space:nowrap;text-shadow:0 1px 3px #000;opacity:${d.active?1:.3}">${d.name}</div>`,className:'',iconAnchor:[-8,5]});
+      depLG.addLayer(L.marker([d.lat,d.lng],{icon:lbl,interactive:false,zIndexOffset:999}));
+    });
+  }
+
+  if(layers.radii){
+    DEPOTS.filter(d=>d.active).forEach(d=>{
+      radLG.addLayer(L.circle([d.lat,d.lng],{radius:r*1609.34,color:d.color,weight:1,opacity:.45,fillOpacity:.04,dashArray:'4 4'}));
+    });
+  }
+
+  updateStats(); renderDepots(); renderZones();
+}
+
+function rowColor(row){ return row.AssignedColor||ZC[row.DeliveryZone]||'#888'; }
+
+function tip(row){
+  return `<b>Zone ${row.DeliveryZone||'?'}</b><br>Depot: ${row.AssignedDepot||row.DeliveryDepot||'—'}<br>Sector: ${row.SectorCode||'—'}<br>Dist: ${row.distMi||'—'} mi`;
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────
+function updateStats(){
+  const una = allocData.filter(r=>r.AssignedDepot==='Unassigned').length;
+  const zones = new Set(allData.map(r=>r.DeliveryZone).filter(Boolean)).size;
+  document.getElementById('s-del').textContent=filtData.length.toLocaleString();
+  document.getElementById('s-dep').textContent=DEPOTS.filter(d=>d.active).length;
+  document.getElementById('s-zon').textContent=zones;
+  document.getElementById('s-una').textContent=una;
+  document.getElementById('dbadge').textContent=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function renderDepots(){
+  const list=document.getElementById('depot-list');
+  list.innerHTML='';
+  DEPOTS.forEach(d=>{
+    const cnt=allocData.filter(r=>r.AssignedDepot===d.name).length;
+    const el=document.createElement('div');
+    el.className='di'+(d.active?' active':' inactive');
+    el.innerHTML=`<div class="dd" style="background:${d.color}"></div><span class="dn">${d.name}</span><span class="dc">${cnt.toLocaleString()}</span><button class="tb">${d.active?'✓':'○'}</button>${DEPOTS.length>1?`<button class="btn bs bd" data-rm="${d.id}">✕</button>`:''}`;
+    el.querySelector('.tb').onclick=e=>{e.stopPropagation();d.active=!d.active;realloc();};
+    const rm=el.querySelector('[data-rm]');
+    if(rm)rm.onclick=e=>{e.stopPropagation();DEPOTS=DEPOTS.filter(x=>x.id!==d.id);realloc();notify('Depot removed. Deliveries reallocated.');};
+    el.onclick=()=>map.flyTo([d.lat,d.lng],11,{duration:.8});
+    list.appendChild(el);
+  });
+}
+
+function renderZones(){
+  const leg=document.getElementById('zone-leg');
+  const zsel=document.getElementById('f-zon');
+  const cur=zsel.value;
+  const counts={};
+  allData.forEach(r=>{const z=r.DeliveryZone||'';counts[z]=(counts[z]||0)+1;});
+  zsel.innerHTML='<option value="">All zones</option>';
+  leg.innerHTML='';
+  Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([z,n])=>{
+    const col=ZC[z]||'#888';
+    const el=document.createElement('div');
+    el.className='zi';
+    el.innerHTML=`<div class="zs" style="background:${col}"></div><span class="zl">Zone ${z}</span><span class="zc">${n.toLocaleString()}</span>`;
+    el.onclick=()=>{zsel.value=z;applyFilters();};
+    leg.appendChild(el);
+    const o=document.createElement('option');
+    o.value=z;o.textContent='Zone '+z;
+    if(z===cur)o.selected=true;
+    zsel.appendChild(o);
+  });
+}
+
+function buildDropdowns(){
+  const dsel=document.getElementById('f-dep');
+  const cur=dsel.value;
+  dsel.innerHTML='<option value="">All depots</option>';
+  [...new Set(allData.map(r=>r.DeliveryDepot).filter(Boolean))].sort().forEach(d=>{
+    const o=document.createElement('option');
+    o.value=d;o.textContent=d;if(d===cur)o.selected=true;
+    dsel.appendChild(o);
+  });
+}
+
+function applyFilters(){
+  const dep=document.getElementById('f-dep').value;
+  const zon=document.getElementById('f-zon').value;
+  filtData=allData.filter(r=>{
+    if(dep&&r.DeliveryDepot!==dep)return false;
+    if(zon&&r.DeliveryZone!==zon)return false;
+    return true;
+  });
+  render();
+}
+
+function realloc(){
+  allocData=allocate(allData);
+  applyFilters();
+}
+
+// ── Info panel ───────────────────────────────────────────────────────
+function showInfo(row){
+  document.getElementById('ip-t').textContent=`Zone ${row.DeliveryZone||'?'} — ${row.SectorCode||''}`;
+  document.getElementById('ip-c').innerHTML=`Assigned depot: <b style="color:${row.AssignedColor}">${row.AssignedDepot}</b><br>Original depot: ${row.DeliveryDepot||'—'}<br>Distance: ${row.distMi||'—'} mi`;
+  document.getElementById('ip').classList.add('show');
+}
+function showDepotInfo(d){
+  const cnt=allocData.filter(r=>r.AssignedDepot===d.name).length;
+  document.getElementById('ip-t').textContent=d.name;
+  document.getElementById('ip-c').innerHTML=`Status: <b style="color:${d.active?'#4CAF50':'#e74c3c'}">${d.active?'Active':'Inactive'}</b><br>Assigned: <b>${cnt.toLocaleString()}</b> deliveries`;
+  document.getElementById('ip').classList.add('show');
+}
+map.on('click',()=>{ if(!picking)document.getElementById('ip').classList.remove('show'); });
+
+// ── Layer toggles ────────────────────────────────────────────────────
+function tog(k,btn){layers[k]=!layers[k];btn.classList.toggle('on',layers[k]);render();}
+
+// ── Notify ───────────────────────────────────────────────────────────
+function notify(msg){const el=document.getElementById('notif');el.textContent=msg;el.style.display='block';setTimeout(()=>el.style.display='none',2500);}
+
+// ── Add depot ────────────────────────────────────────────────────────
+document.getElementById('add-btn').onclick=()=>document.getElementById('adf').classList.toggle('open');
+document.getElementById('nd-cancel').onclick=()=>document.getElementById('adf').classList.remove('open');
+document.getElementById('nd-pick').onclick=()=>{picking=true;map.getContainer().style.cursor='crosshair';notify('Click map to place depot');};
+map.on('click',e=>{
+  if(!picking)return;
+  picking=false;map.getContainer().style.cursor='';
+  document.getElementById('nd-lat').value=e.latlng.lat.toFixed(4);
+  document.getElementById('nd-lng').value=e.latlng.lng.toFixed(4);
+  notify(`Coords set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+});
+document.getElementById('nd-ok').onclick=()=>{
+  const name=document.getElementById('nd-name').value.trim();
+  const lat=parseFloat(document.getElementById('nd-lat').value);
+  const lng=parseFloat(document.getElementById('nd-lng').value);
+  if(!name||isNaN(lat)||isNaN(lng)){notify('Fill all fields');return;}
+  DEPOTS.push({id:'d'+Date.now(),name,lat,lng,color:DC[dcIdx%DC.length],active:true});
+  dcIdx++;
+  document.getElementById('nd-name').value='';
+  document.getElementById('nd-lat').value='';
+  document.getElementById('nd-lng').value='';
+  document.getElementById('adf').classList.remove('open');
+  realloc();notify(`Added depot: ${name}`);
+};
+document.getElementById('f-dep').onchange=applyFilters;
+document.getElementById('f-zon').onchange=applyFilters;
+document.getElementById('f-view').onchange=render;
+document.getElementById('radius').oninput=function(){document.getElementById('rv').textContent=this.value+' mi';};
+document.getElementById('radius').onchange=realloc;
+document.getElementById('realloc').onclick=realloc;
+
+// ── INIT — read from hash ────────────────────────────────────────────
+function init(){
+  const {rows, depotOverride} = parseHash();
+  if(depotOverride) DEPOTS = depotOverride.map((d,i)=>({id:'d'+i,name:d.name,lat:d.lat,lng:d.lng,color:DC[i%DC.length],active:true}));
+  allData = rows;
+  allocData = allocate(allData);
+  filtData = allData;
+  buildDropdowns();
+  render();
+  if(allData.length) map.fitBounds(allData.map(r=>[r.Lat,r.Long]).filter(([a,b])=>!isNaN(a)&&!isNaN(b)));
+}
+
+init();
+</script>
+</body>
+</html>
