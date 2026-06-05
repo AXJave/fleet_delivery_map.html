@@ -935,8 +935,13 @@ map.on('click',async function(e){
   drawDeliveries();
 });
 
-drawDepots();
-drawDeliveries();
+// Pre-geocode ALL outcodes on load so subsequent filter/zoom changes never hit the API
+(async function(){
+  var allOcs = DATA.map(function(r){return r.o;}).filter(function(o,i,a){return a.indexOf(o)===i;});
+  await geocodeBatch(allOcs);
+  drawDepots();
+  drawDeliveries();
+})();
 </script>
 </body>
 </html>
