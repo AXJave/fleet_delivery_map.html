@@ -9,16 +9,16 @@
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf6;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+html,body{font-family:'Segoe UI',sans-serif;background:#0f1117;color:#e8eaf6;height:100%;display:flex;flex-direction:column;overflow:hidden}
 #hdr{padding:8px 14px;background:#1a1d27;border-bottom:1px solid #2e3354;display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap}
 #hdr h1{font-size:14px;font-weight:600;white-space:nowrap}
 .stat{display:flex;flex-direction:column;align-items:flex-end}
 .sv{font-size:15px;font-weight:700;color:#4f8ef7}
 .sl{font-size:9px;color:#8b92c4;text-transform:uppercase;letter-spacing:.5px}
 #stats{display:flex;gap:14px;margin-left:auto}
-#main{display:flex;flex:1;overflow:hidden}
+#main{display:flex;flex:1;overflow:hidden;min-height:0}
 #sb{width:260px;background:#1a1d27;border-right:1px solid #2e3354;overflow-y:auto;flex-shrink:0}
-#map{flex:1}
+#map{flex:1;min-height:0}
 .sec{border-bottom:1px solid #2e3354;padding:10px 12px}
 .sec-t{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#8b92c4;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
 .fg{margin-bottom:8px}
@@ -405,7 +405,7 @@ function init(){
   if(allData.length) map.fitBounds(allData.map(r=>[r.Lat,r.Long]).filter(([a,b])=>!isNaN(a)&&!isNaN(b)));
 }
 
-init();
+init(); setTimeout(function(){map.invalidateSize();},300);
 </script>
 </body>
 </html>
