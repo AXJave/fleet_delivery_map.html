@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fleet Delivery Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3354;
+    --text:#e8eaf6;--muted:#8b92c4;--accent:#4f8ef7;
+    --z1:#4CAF50;--z2:#2196F3;--z3:#FF9800;--z4:#E91E63;--z5:#9C27B0;
+    --z6:#00BCD4;--z7:#FF5722;--z8:#607D8B;--z9:#8BC34A;--z10:#FFC107;
+  }
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  
+  /* Header */
+  #header{padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap}
+  #header h1{font-size:15px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+  .badge{font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;color:var(--muted)}
+  #stat-bar{display:flex;gap:16px;margin-left:auto;flex-wrap:wrap}
+  .stat{display:flex;flex-direction:column;align-items:flex-end}
+  .stat-val{font-size:16px;font-weight:700;color:var(--accent)}
+  .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+
+  /* Layout */
+  #main{display:flex;flex:1;overflow:hidden}
+  #sidebar{width:300px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+  #map{flex:1;background:#111}
+
+  /* Sidebar sections */
+  .section{border-bottom:1px solid var(--border);padding:12px 14px}
+  .section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+  
+  /* Filters */
+  .filter-group{margin-bottom:10px}
+  .filter-group label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  select,input[type=range]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;cursor:pointer}
+  select:focus{outline:none;border-color:var(--accent)}
+  input[type=range]{padding:0;accent-color:var(--accent)}
+  .range-row{display:flex;align-items:center;gap:8px}
+  .range-val{font-size:13px;font-weight:600;color:var(--accent);min-width:50px;text-align:right}
+
+  /* Depot list */
+  .depot-item{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;transition:border-color .15s}
+  .depot-item:hover{border-color:var(--accent)}
+  .depot-item.inactive{opacity:.45}
+  .depot-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .depot-name{font-size:12px;font-weight:500;flex:1}
+  .depot-count{font-size:11px;color:var(--muted)}
+  .toggle-btn{width:20px;height:20px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px;flex-shrink:0;transition:all .15s}
+  .toggle-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .depot-item.active .toggle-btn{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* Add depot form */
+  .add-depot-form{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:8px}
+  .add-depot-form.open{display:block}
+  .form-row{display:flex;gap:6px;margin-bottom:6px}
+  input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;padding:5px 8px;width:100%}
+  input[type=text]:focus,input[type=number]:focus{outline:none;border-color:var(--accent)}
+  .btn{border:1px solid var(--border);background:transparent;color:var(--text);border-radius:5px;font-size:12px;padding:5px 10px;cursor:pointer;transition:all .15s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{background:#3a7de8;border-color:#3a7de8;color:#fff}
+  .btn-sm{padding:3px 8px;font-size:11px}
+  .btn-danger{border-color:#e74c3c;color:#e74c3c}
+  .btn-danger:hover{background:#e74c3c;color:#fff}
+
+  /* Zone legend */
+  .zone-item{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer}
+  .zone-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+  .zone-label{font-size:12px;flex:1}
+  .zone-count{font-size:11px;color:var(--muted)}
+  .zone-item.dimmed .zone-label,.zone-item.dimmed .zone-count{opacity:.35}
+
+  /* Map controls overlay */
+  #map-controls{position:absolute;top:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:6px}
+  .map-btn{background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all .15s}
+  .map-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .map-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* Tooltip */
+  .leaflet-tooltip.delivery-tip{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px 10px;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .tip-row{display:flex;gap:8px;margin-bottom:2px}
+  .tip-label{color:var(--muted);min-width:70px}
+
+  /* Info panel */
+  #info-panel{position:absolute;bottom:16px;right:12px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;min-width:200px;display:none}
+  #info-panel.show{display:block}
+  #info-title{font-size:13px;font-weight:600;margin-bottom:8px}
+  #info-content{font-size:12px;color:var(--muted);line-height:1.8}
+
+  /* Notification */
+  #notif{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:2000;background:#1e4f2e;border:1px solid #2d7a44;border-radius:6px;color:#7fda9c;padding:8px 16px;font-size:12px;display:none;white-space:nowrap}
+  #notif.show{display:block}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>⬡ Fleet Delivery Map</h1>
+  <span class="badge" id="date-badge">Loading...</span>
+  <div id="stat-bar">
+    <div class="stat"><span class="stat-val" id="stat-total">0</span><span class="stat-lbl">Deliveries</span></div>
+    <div class="stat"><span class="stat-val" id="stat-depots">0</span><span class="stat-lbl">Active Depots</span></div>
+    <div class="stat"><span class="stat-val" id="stat-zones">0</span><span class="stat-lbl">Zones</span></div>
+    <div class="stat"><span class="stat-val" id="stat-unassigned">0</span><span class="stat-lbl">Unassigned</span></div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+
+    <!-- Filters -->
+    <div class="section">
+      <div class="section-title">Filters</div>
+      <div class="filter-group">
+        <label>Depot</label>
+        <select id="filter-depot"><option value="ALL">All depots</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Zone</label>
+        <select id="filter-zone"><option value="ALL">All zones</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Job Type</label>
+        <select id="filter-jobtype"><option value="ALL">All types</option></select>
+      </div>
+      <div class="filter-group">
+        <label>View Mode</label>
+        <select id="view-mode">
+          <option value="dots">Coloured dots</option>
+          <option value="heat">Heatmap</option>
+          <option value="cluster">Clustered</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Depot Management -->
+    <div class="section">
+      <div class="section-title">
+        Depots
+        <button class="btn btn-sm btn-primary" id="add-depot-btn">+ Add</button>
+      </div>
+
+      <div class="add-depot-form" id="add-depot-form">
+        <div class="form-row">
+          <input type="text" id="new-depot-name" placeholder="Depot name" style="flex:2"/>
+        </div>
+        <div class="form-row">
+          <input type="number" id="new-depot-lat" placeholder="Lat" step="0.0001"/>
+          <input type="number" id="new-depot-lng" placeholder="Long" step="0.0001"/>
+        </div>
+        <div class="form-row">
+          <button class="btn btn-sm btn-primary" id="confirm-add-depot">Add Depot</button>
+          <button class="btn btn-sm" id="cancel-add-depot">Cancel</button>
+          <button class="btn btn-sm" id="pick-on-map-btn" title="Click map to place">📍 Pick</button>
+        </div>
+      </div>
+
+      <div id="depot-list"></div>
+    </div>
+
+    <!-- Allocation Radius -->
+    <div class="section">
+      <div class="section-title">Allocation Radius</div>
+      <div class="range-row">
+        <input type="range" id="radius-slider" min="5" max="100" value="30" step="5"/>
+        <span class="range-val" id="radius-val">30 mi</span>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">Deliveries within this radius of the nearest active depot are auto-assigned to that depot.</p>
+      <button class="btn btn-sm btn-primary" id="reallocate-btn" style="margin-top:8px;width:100%">↺ Reallocate All</button>
+    </div>
+
+    <!-- Zone Legend -->
+    <div class="section">
+      <div class="section-title">Zone Legend</div>
+      <div id="zone-legend"></div>
+    </div>
+
+  </div>
+
+  <div style="position:relative;flex:1;display:flex;flex-direction:column">
+    <div id="map"></div>
+    <div id="map-controls">
+      <button class="map-btn active" id="btn-zones" onclick="toggleLayer('zones',this)">Zone Colours</button>
+      <button class="map-btn active" id="btn-depots" onclick="toggleLayer('depots',this)">Depot Markers</button>
+      <button class="map-btn active" id="btn-radii" onclick="toggleLayer('radii',this)">Depot Radii</button>
+      <button class="map-btn" id="btn-unassigned" onclick="toggleLayer('unassigned',this)">Unassigned Only</button>
+    </div>
+    <div id="info-panel">
+      <div id="info-title"></div>
+      <div id="info-content"></div>
+    </div>
+    <div id="notif"></div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────
+   DATA LAYER
+   Replace SAMPLE_DATA below with your Power BI
+   JSON measure output. The map expects an array
+   of delivery objects with the fields shown.
+   Power BI integration: use a DAX measure that
+   calls JSON.stringify on the filtered table and
+   pass it to this page via a query parameter or
+   a Power BI HTML visual data binding.
+   ───────────────────────────────────────────── */
+
+const ZONE_COLORS = {
+  'Zone 1':'#4CAF50','Zone 2':'#2196F3','Zone 3':'#FF9800','Zone 4':'#E91E63',
+  'Zone 5':'#9C27B0','Zone 6':'#00BCD4','Zone 7':'#FF5722','Zone 8':'#607D8B',
+  'Zone 9':'#8BC34A','Zone 10':'#FFC107','Unknown':'#555'
+};
+
+/* ── Sample data representing your TMDL structure ── */
+function generateSampleData(){
+  const depotSeeds = [
+    {name:'Manchester',lat:53.4808,lng:-2.2426},
+    {name:'Birmingham',lat:52.4862,lng:-1.8904},
+    {name:'Leeds',lat:53.7997,lng:-1.5492},
+    {name:'Sheffield',lat:53.3811,lng:-1.4701},
+    {name:'Liverpool',lat:53.4084,lng:-2.9916}
+  ];
+  const zones = Object.keys(ZONE_COLORS).filter(z=>z!=='Unknown');
+  const jobTypes = ['Collection','Delivery','Exchange'];
+  const manufacturers = ['Ford','Vauxhall','BMW','Mercedes','Volkswagen','Toyota'];
+  const rows=[];
+  let id=1;
+  for(let i=0;i<800;i++){
+    const seed = depotSeeds[Math.floor(Math.random()*depotSeeds.length)];
+    const spread = 0.8+Math.random()*0.8;
+    const lat = seed.lat+(Math.random()-0.5)*spread;
+    const lng = seed.lng+(Math.random()-0.5)*spread*1.5;
+    const zone = zones[Math.floor(Math.random()*zones.length)];
+    rows.push({
+      JobID: id++,
+      ClaimID: Math.floor(10000+Math.random()*90000),
+      JobDate: new Date(Date.now()-Math.random()*365*86400000).toISOString().slice(0,10),
+      DeliveryDepot: seed.name,
+      DriverName: ['J Smith','A Brown','M Jones','K Patel','T Wilson'][Math.floor(Math.random()*5)],
+      PostCode: 'M'+Math.floor(Math.random()*99)+' '+Math.floor(Math.random()*9)+'AB',
+      VRM: 'AB'+Math.floor(10+Math.random()*89)+' XYZ',
+      Manufacturer: manufacturers[Math.floor(Math.random()*manufacturers.length)],
+      Model: ['Focus','Astra','3 Series','C Class','Golf','Corolla'][Math.floor(Math.random()*6)],
+      DeliveryZone: zone,
+      HireDays: Math.floor(1+Math.random()*30),
+      JobType: jobTypes[Math.floor(Math.random()*3)],
+      Lat: lat,
+      Long: lng,
+      AssignedDepot: seed.name
+    });
+  }
+  return rows;
+}
+
+/* ── Try to load real data from Power BI query param, else use sample ── */
+function loadData(){
+  try{
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('data');
+    if(raw) return JSON.parse(decodeURIComponent(raw));
+  }catch(e){}
+  return generateSampleData();
+}
+
+/* ─────────────────────────────────────────────
+   DEPOT REGISTRY
+   ───────────────────────────────────────────── */
+let DEPOTS = [
+  {id:'d1',name:'Manchester', lat:53.4808,lng:-2.2426,color:'#4f8ef7',active:true},
+  {id:'d2',name:'Birmingham', lat:52.4862,lng:-1.8904,color:'#4CAF50',active:true},
+  {id:'d3',name:'Leeds',      lat:53.7997,lng:-1.5492,color:'#FF9800',active:true},
+  {id:'d4',name:'Sheffield',  lat:53.3811,lng:-1.4701,color:'#E91E63',active:true},
+  {id:'d5',name:'Liverpool',  lat:53.4084,lng:-2.9916,color:'#9C27B0',active:true}
+];
+const DEPOT_COLORS=['#4f8ef7','#4CAF50','#FF9800','#E91E63','#9C27B0','#00BCD4','#FF5722','#FFC107','#8BC34A','#607D8B'];
+let colorIdx = DEPOTS.length;
+
+/* ─────────────────────────────────────────────
+   MAP INIT
+   ───────────────────────────────────────────── */
+const map = L.map('map',{zoomControl:true,attributionControl:false}).setView([53.0,−1.8],7);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+
+const deliveryLayerGroup = L.layerGroup().addTo(map);
+const depotLayerGroup    = L.layerGroup().addTo(map);
+const radiusLayerGroup   = L.layerGroup().addTo(map);
+let heatLayer = null;
+
+let layers = {zones:true,depots:true,radii:true,unassigned:false};
+
+/* ─────────────────────────────────────────────
+   STATE
+   ───────────────────────────────────────────── */
+let allData = [];
+let filteredData = [];
+let allocatedData = [];
+let pickingOnMap = false;
+
+/* ─────────────────────────────────────────────
+   HAVERSINE
+   ───────────────────────────────────────────── */
+function haversineMiles(lat1,lng1,lat2,lng2){
+  const R=3958.8,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+/* ─────────────────────────────────────────────
+   ALLOCATION ENGINE
+   ───────────────────────────────────────────── */
+function allocateDeliveries(data){
+  const activeDepots = DEPOTS.filter(d=>d.active);
+  const radius = parseInt(document.getElementById('radius-slider').value);
+  return data.map(row=>{
+    if(!row.Lat||!row.Long) return {...row,AssignedDepot:'Unassigned',AssignedColor:'#555',distToDepot:null};
+    let best=null, bestDist=Infinity;
+    for(const d of activeDepots){
+      const dist = haversineMiles(row.Lat,row.Long,d.lat,d.lng);
+      if(dist<bestDist){bestDist=dist;best=d;}
+    }
+    if(best && bestDist<=radius){
+      return {...row,AssignedDepot:best.name,AssignedColor:best.color,distToDepot:bestDist.toFixed(1)};
+    }
+    return {...row,AssignedDepot:'Unassigned',AssignedColor:'#555',distToDepot:bestDist?bestDist.toFixed(1):null};
+  });
+}
+
+/* ─────────────────────────────────────────────
+   RENDER MAP
+   ───────────────────────────────────────────── */
+function getColor(row){
+  const mode = document.getElementById('filter-zone').value;
+  // colour by depot assignment
+  return row.AssignedColor || ZONE_COLORS[row.DeliveryZone] || '#888';
+}
+
+function renderMap(){
+  deliveryLayerGroup.clearLayers();
+  depotLayerGroup.clearLayers();
+  radiusLayerGroup.clearLayers();
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+
+  const viewMode = document.getElementById('view-mode').value;
+  const radius = parseInt(document.getElementById('radius-slider').value);
+  const showUnassignedOnly = layers.unassigned;
+
+  const toRender = showUnassignedOnly
+    ? allocatedData.filter(r=>r.AssignedDepot==='Unassigned')
+    : filteredData.map(r=>allocatedData.find(a=>a.JobID===r.JobID)||r);
+
+  if(viewMode==='heat'){
+    const pts = toRender.filter(r=>r.Lat&&r.Long).map(r=>[r.Lat,r.Long,0.6]);
+    if(pts.length){
+      heatLayer = L.heatLayer(pts,{radius:25,blur:20,maxZoom:10,gradient:{0.2:'#2196F3',0.5:'#FF9800',1:'#E91E63'}}).addTo(map);
+    }
+  } else if(viewMode==='cluster'){
+    renderCluster(toRender);
+  } else {
+    for(const row of toRender){
+      if(!row.Lat||!row.Long) continue;
+      const color = getColorForRow(row);
+      const marker = L.circleMarker([row.Lat,row.Long],{
+        radius:5,fillColor:color,color:'rgba(0,0,0,0.3)',weight:1,fillOpacity:0.85
+      });
+      marker.bindTooltip(buildTooltip(row),{className:'delivery-tip',sticky:true,offset:[10,0]});
+      marker.on('click',()=>showInfo(row));
+      if(layers.zones) deliveryLayerGroup.addLayer(marker);
+    }
+  }
+
+  // Depot markers
+  if(layers.depots){
+    for(const depot of DEPOTS){
+      const icon = L.divIcon({
+        html:`<div style="background:${depot.color};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 8px ${depot.color}88;opacity:${depot.active?1:0.3}"></div>`,
+        className:'',iconAnchor:[7,7]
+      });
+      const m = L.marker([depot.lat,depot.lng],{icon,zIndexOffset:1000});
+      m.bindTooltip(`<b>${depot.name}</b><br>${depot.active?'Active':'Inactive'}`,{className:'delivery-tip'});
+      m.on('click',()=>showDepotInfo(depot));
+      depotLayerGroup.addLayer(m);
+
+      // Big label
+      const label = L.divIcon({
+        html:`<div style="color:${depot.color};font-size:11px;font-weight:700;white-space:nowrap;text-shadow:0 1px 3px #000;opacity:${depot.active?1:0.3}">${depot.name}</div>`,
+        className:'',iconAnchor:[-8,6]
+      });
+      depotLayerGroup.addLayer(L.marker([depot.lat,depot.lng],{icon:label,interactive:false,zIndexOffset:999}));
+    }
+  }
+
+  // Radius circles
+  if(layers.radii){
+    for(const depot of DEPOTS.filter(d=>d.active)){
+      const circle = L.circle([depot.lat,depot.lng],{
+        radius:radius*1609.34,
+        color:depot.color,weight:1,opacity:0.5,fillOpacity:0.04,dashArray:'4 4'
+      });
+      radiusLayerGroup.addLayer(circle);
+    }
+  }
+
+  updateStats();
+  renderDepotList();
+  renderZoneLegend();
+}
+
+function getColorForRow(row){
+  // If filter-zone is zone mode, colour by zone; else colour by assigned depot
+  const zoneFilter = document.getElementById('filter-zone').value;
+  return row.AssignedColor || ZONE_COLORS[row.DeliveryZone] || '#888';
+}
+
+function renderCluster(data){
+  // Simple grid clustering
+  const cells={};
+  const precision=2;
+  for(const row of data){
+    if(!row.Lat||!row.Long) continue;
+    const key=`${row.Lat.toFixed(precision)},${row.Long.toFixed(precision)}`;
+    if(!cells[key]) cells[key]={lat:+row.Lat.toFixed(precision),lng:+row.Long.toFixed(precision),count:0,color:getColorForRow(row),rows:[]};
+    cells[key].count++;cells[key].rows.push(row);
+  }
+  for(const c of Object.values(cells)){
+    const r=Math.min(4+c.count*0.5,18);
+    const marker=L.circleMarker([c.lat,c.lng],{radius:r,fillColor:c.color,color:'rgba(0,0,0,0.3)',weight:1,fillOpacity:0.75});
+    if(c.count>1){
+      marker.bindTooltip(`<b>${c.count} deliveries</b>`,{className:'delivery-tip',permanent:false});
+    } else {
+      marker.bindTooltip(buildTooltip(c.rows[0]),{className:'delivery-tip',sticky:true});
+    }
+    deliveryLayerGroup.addLayer(marker);
+  }
+}
+
+function buildTooltip(row){
+  return `<div class="tip-row"><span class="tip-label">Job ID</span><b>${row.JobID}</b></div>
+<div class="tip-row"><span class="tip-label">Depot</span>${row.AssignedDepot||row.DeliveryDepot}</div>
+<div class="tip-row"><span class="tip-label">Zone</span>${row.DeliveryZone||'—'}</div>
+<div class="tip-row"><span class="tip-label">Driver</span>${row.DriverName||'—'}</div>
+<div class="tip-row"><span class="tip-label">Vehicle</span>${row.Manufacturer||''} ${row.Model||''}</div>
+<div class="tip-row"><span class="tip-label">Job Type</span>${row.JobType||'—'}</div>`;
+}
+
+/* ─────────────────────────────────────────────
+   STATS & SIDEBAR
+   ───────────────────────────────────────────── */
+function updateStats(){
+  const activeDepots = DEPOTS.filter(d=>d.active).length;
+  const zones = new Set(allocatedData.map(r=>r.DeliveryZone).filter(Boolean)).size;
+  const unassigned = allocatedData.filter(r=>r.AssignedDepot==='Unassigned').length;
+  document.getElementById('stat-total').textContent = filteredData.length.toLocaleString();
+  document.getElementById('stat-depots').textContent = activeDepots;
+  document.getElementById('stat-zones').textContent = zones;
+  document.getElementById('stat-unassigned').textContent = unassigned;
+  document.getElementById('date-badge').textContent = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function renderDepotList(){
+  const list = document.getElementById('depot-list');
+  list.innerHTML='';
+  for(const d of DEPOTS){
+    const count = allocatedData.filter(r=>r.AssignedDepot===d.name).length;
+    const div = document.createElement('div');
+    div.className='depot-item'+(d.active?' active':' inactive');
+    div.innerHTML=`
+      <div class="depot-dot" style="background:${d.color}"></div>
+      <span class="depot-name">${d.name}</span>
+      <span class="depot-count">${count.toLocaleString()}</span>
+      <button class="toggle-btn" title="${d.active?'Deactivate':'Activate'}">${d.active?'✓':'○'}</button>
+      ${DEPOTS.length>1?`<button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px" data-remove="${d.id}">✕</button>`:''}
+    `;
+    div.querySelector('.toggle-btn').addEventListener('click',(e)=>{
+      e.stopPropagation();
+      d.active=!d.active;
+      runAllocation();
+    });
+    const removeBtn = div.querySelector('[data-remove]');
+    if(removeBtn) removeBtn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      removeDepot(d.id);
+    });
+    div.addEventListener('click',()=>map.flyTo([d.lat,d.lng],11,{duration:0.8}));
+    list.appendChild(div);
+  }
+}
+
+function renderZoneLegend(){
+  const legend = document.getElementById('zone-legend');
+  const zoneCounts={};
+  for(const r of filteredData){
+    const z=r.DeliveryZone||'Unknown';
+    zoneCounts[z]=(zoneCounts[z]||0)+1;
+  }
+  // Also build zone filter dropdown
+  const zoneSelect = document.getElementById('filter-zone');
+  const currentZone = zoneSelect.value;
+  zoneSelect.innerHTML='<option value="ALL">All zones</option>';
+  legend.innerHTML='';
+  const sorted = Object.entries(zoneCounts).sort((a,b)=>b[1]-a[1]);
+  for(const [zone,count] of sorted){
+    const color = ZONE_COLORS[zone]||'#888';
+    const item = document.createElement('div');
+    item.className='zone-item';
+    item.innerHTML=`<div class="zone-swatch" style="background:${color}"></div><span class="zone-label">${zone}</span><span class="zone-count">${count.toLocaleString()}</span>`;
+    item.addEventListener('click',()=>{
+      document.getElementById('filter-zone').value=zone;
+      applyFilters();
+    });
+    legend.appendChild(item);
+    const opt=document.createElement('option');
+    opt.value=zone;opt.textContent=zone;
+    if(zone===currentZone) opt.selected=true;
+    zoneSelect.appendChild(opt);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   FILTERS
+   ───────────────────────────────────────────── */
+function applyFilters(){
+  const depot = document.getElementById('filter-depot').value;
+  const zone  = document.getElementById('filter-zone').value;
+  const jtype = document.getElementById('filter-jobtype').value;
+  filteredData = allData.filter(r=>{
+    if(depot!=='ALL' && r.AssignedDepot!==depot && r.DeliveryDepot!==depot) return false;
+    if(zone!=='ALL'  && r.DeliveryZone!==zone) return false;
+    if(jtype!=='ALL' && r.JobType!==jtype) return false;
+    return true;
+  });
+  renderMap();
+}
+
+function buildFilterDropdowns(){
+  const depotSel = document.getElementById('filter-depot');
+  const jtSel    = document.getElementById('filter-jobtype');
+  const currentDepot = depotSel.value;
+  const currentJt    = jtSel.value;
+  depotSel.innerHTML='<option value="ALL">All depots</option>';
+  jtSel.innerHTML='<option value="ALL">All types</option>';
+  const depots = [...new Set(allData.map(r=>r.DeliveryDepot).filter(Boolean))].sort();
+  for(const d of depots){const o=document.createElement('option');o.value=d;o.textContent=d;if(d===currentDepot)o.selected=true;depotSel.appendChild(o);}
+  const jts = [...new Set(allData.map(r=>r.JobType).filter(Boolean))].sort();
+  for(const j of jts){const o=document.createElement('option');o.value=j;o.textContent=j;if(j===currentJt)o.selected=true;jtSel.appendChild(o);}
+}
+
+/* ─────────────────────────────────────────────
+   ALLOCATION RUNNER
+   ───────────────────────────────────────────── */
+function runAllocation(){
+  allocatedData = allocateDeliveries(allData);
+  applyFilters();
+  showNotif('Allocations updated');
+}
+
+/* ─────────────────────────────────────────────
+   DEPOT MANAGEMENT
+   ───────────────────────────────────────────── */
+function removeDepot(id){
+  if(DEPOTS.length<=1){showNotif('Must keep at least one depot','warn');return;}
+  const depot = DEPOTS.find(d=>d.id===id);
+  DEPOTS = DEPOTS.filter(d=>d.id!==id);
+  runAllocation();
+  showNotif(`Removed depot: ${depot.name}. Deliveries reallocated.`);
+}
+
+function addDepot(name,lat,lng){
+  const color = DEPOT_COLORS[colorIdx%DEPOT_COLORS.length];
+  colorIdx++;
+  DEPOTS.push({id:'d'+Date.now(),name,lat,lng,color,active:true});
+  buildFilterDropdowns();
+  runAllocation();
+  showNotif(`Added depot: ${name}`);
+}
+
+/* ─────────────────────────────────────────────
+   LAYER TOGGLES
+   ───────────────────────────────────────────── */
+function toggleLayer(key,btn){
+  layers[key]=!layers[key];
+  btn.classList.toggle('active',layers[key]);
+  renderMap();
+}
+
+/* ─────────────────────────────────────────────
+   INFO PANEL
+   ───────────────────────────────────────────── */
+function showInfo(row){
+  document.getElementById('info-title').textContent=`Job #${row.JobID}`;
+  document.getElementById('info-content').innerHTML=`
+    <div>Depot: <b style="color:${row.AssignedColor}">${row.AssignedDepot}</b></div>
+    <div>Zone: ${row.DeliveryZone||'—'}</div>
+    <div>Driver: ${row.DriverName||'—'}</div>
+    <div>Vehicle: ${row.Manufacturer||''} ${row.Model||''} (${row.VRM||'—'})</div>
+    <div>Job Type: ${row.JobType||'—'}</div>
+    <div>Hire Days: ${row.HireDays||'—'}</div>
+    <div>Distance to depot: ${row.distToDepot||'—'} mi</div>
+    <div>Postcode: ${row.PostCode||'—'}</div>
+  `;
+  document.getElementById('info-panel').classList.add('show');
+}
+
+function showDepotInfo(depot){
+  const count = allocatedData.filter(r=>r.AssignedDepot===depot.name).length;
+  document.getElementById('info-title').textContent=depot.name;
+  document.getElementById('info-content').innerHTML=`
+    <div>Status: <b style="color:${depot.active?'#4CAF50':'#e74c3c'}">${depot.active?'Active':'Inactive'}</b></div>
+    <div>Assigned deliveries: <b>${count.toLocaleString()}</b></div>
+    <div>Lat: ${depot.lat.toFixed(4)}, Lng: ${depot.lng.toFixed(4)}</div>
+  `;
+  document.getElementById('info-panel').classList.add('show');
+}
+
+map.on('click',()=>document.getElementById('info-panel').classList.remove('show'));
+
+/* ─────────────────────────────────────────────
+   NOTIFICATIONS
+   ───────────────────────────────────────────── */
+function showNotif(msg){
+  const el=document.getElementById('notif');
+  el.textContent=msg;el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+/* ─────────────────────────────────────────────
+   MAP PICKING
+   ───────────────────────────────────────────── */
+document.getElementById('pick-on-map-btn').addEventListener('click',()=>{
+  pickingOnMap=true;
+  showNotif('Click the map to place a new depot');
+  map.getContainer().style.cursor='crosshair';
+});
+
+map.on('click',(e)=>{
+  if(!pickingOnMap) return;
+  pickingOnMap=false;
+  map.getContainer().style.cursor='';
+  document.getElementById('new-depot-lat').value=e.latlng.lat.toFixed(4);
+  document.getElementById('new-depot-lng').value=e.latlng.lng.toFixed(4);
+  showNotif(`Coordinates set: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+});
+
+/* ─────────────────────────────────────────────
+   EVENT WIRING
+   ───────────────────────────────────────────── */
+document.getElementById('filter-depot').addEventListener('change',applyFilters);
+document.getElementById('filter-zone').addEventListener('change',applyFilters);
+document.getElementById('filter-jobtype').addEventListener('change',applyFilters);
+document.getElementById('view-mode').addEventListener('change',renderMap);
+
+document.getElementById('radius-slider').addEventListener('input',function(){
+  document.getElementById('radius-val').textContent=this.value+' mi';
+});
+document.getElementById('radius-slider').addEventListener('change',()=>runAllocation());
+
+document.getElementById('reallocate-btn').addEventListener('click',()=>runAllocation());
+
+document.getElementById('add-depot-btn').addEventListener('click',()=>{
+  document.getElementById('add-depot-form').classList.toggle('open');
+});
+document.getElementById('cancel-add-depot').addEventListener('click',()=>{
+  document.getElementById('add-depot-form').classList.remove('open');
+});
+document.getElementById('confirm-add-depot').addEventListener('click',()=>{
+  const name = document.getElementById('new-depot-name').value.trim();
+  const lat  = parseFloat(document.getElementById('new-depot-lat').value);
+  const lng  = parseFloat(document.getElementById('new-depot-lng').value);
+  if(!name||isNaN(lat)||isNaN(lng)){showNotif('Please fill all fields');return;}
+  addDepot(name,lat,lng);
+  document.getElementById('new-depot-name').value='';
+  document.getElementById('new-depot-lat').value='';
+  document.getElementById('new-depot-lng').value='';
+  document.getElementById('add-depot-form').classList.remove('open');
+});
+
+/* ─────────────────────────────────────────────
+   POWER BI INTEGRATION HOOK
+   Call window.updateMapData(jsonArray) from the
+   Power BI HTML visual to inject live data.
+   ───────────────────────────────────────────── */
+window.updateMapData = function(data){
+  allData = data;
+  allocatedData = allocateDeliveries(allData);
+  filteredData = allData;
+  buildFilterDropdowns();
+  renderMap();
+};
+
+/* ─────────────────────────────────────────────
+   INIT
+   ───────────────────────────────────────────── */
+allData = loadData();
+allocatedData = allocateDeliveries(allData);
+filteredData = allData;
+buildFilterDropdowns();
+renderMap();
+</script>
+</body>
+</html>
