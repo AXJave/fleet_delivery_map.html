@@ -223,7 +223,9 @@ function calcZoneFromDist(km){
 
 // State
 let reassignments={};  // depotName -> targetDepotName (can be 'Virtual')
-let ecOn=true,dropMode=false,cache={};
+let ecOn=true,dropMode=false;
+var cache={};
+try{var _sc=sessionStorage.getItem('gc');if(_sc)cache=JSON.parse(_sc);}catch(e){}
 let dMarkers=[],dptMarkers=[],dLabels=[];
 var activeDepotFilter=[];  // empty = all
 var activeZoneFilter=[];   // empty = all
@@ -536,7 +538,7 @@ async function geocodeBatch(ocs){
     await Promise.all(batch.map(async function(oc){
       try{
         var r=await fetch('https://api.postcodes.io/outcodes/'+oc);
-        if(r.ok){var d=await r.json();if(d.result)cache[oc]={lat:d.result.latitude,lng:d.result.longitude};}
+        if(r.ok){var d=await r.json();if(d.result){cache[oc]={lat:d.result.latitude,lng:d.result.longitude};try{sessionStorage.setItem('gc',JSON.stringify(cache));}catch(e){}}}
       }catch(e){}
     }));
     document.getElementById('lc').textContent=Math.min(i+20,todo.length);
