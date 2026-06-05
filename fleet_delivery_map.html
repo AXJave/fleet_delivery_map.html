@@ -692,6 +692,10 @@ window.updateMapData = function(data){
   renderMap();
 };
 
+window.addEventListener('message', function(e){
+  if(e.data && e.data.type === 'mapdata') init(e.data.data);
+});
+
 /* ─────────────────────────────────────────────
    INIT
    ───────────────────────────────────────────── */
